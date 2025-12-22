@@ -9,7 +9,7 @@
     
     <?php showMessage(); ?>
     
-    
+    <!-- Quick Actions -->
     <div class="dashboard-grid" style="margin-bottom: 30px;">
         <div class="dashboard-card">
             <h3>Quick Actions</h3>

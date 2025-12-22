@@ -11,4 +11,4 @@ try {
 // Load all database functions
 require_once __DIR__ . '/../helpers/db_functions.php';
 ?>
-#test
+

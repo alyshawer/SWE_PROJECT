@@ -153,8 +153,7 @@ CREATE TABLE audit_logs (
     FOREIGN KEY (userId) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- Add platform_fee to payments (platform's commission)
-ALTER TABLE payments ADD COLUMN platform_fee DECIMAL(10,2) DEFAULT 0;
+
 
 -- Disputes table (UML: Dispute class)
 CREATE TABLE disputes (
@@ -208,7 +207,8 @@ CREATE TABLE system_config (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
-
+-- Add platform_fee to payments (platform's commission)
+ALTER TABLE payments ADD COLUMN platform_fee DECIMAL(10,2) DEFAULT 0;
 -- Insert sample freelancer profile
 INSERT INTO freelancer_profiles (user_id, skills, past_projects, portfolio_link, bio, hourly_rate, availability, totalEarned, completedProjects) VALUES
 (2, 'PHP, MySQL, JavaScript, HTML/CSS, React, Node.js', 'E-commerce website for local business, Mobile app for restaurant ordering, Database design for healthcare system', 'https://johndoe-portfolio.com', 'Experienced full-stack developer with 5+ years of experience in web development. Passionate about creating efficient and user-friendly applications.', 75.00, 'available', 0.00, 0);

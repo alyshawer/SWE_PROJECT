@@ -1,0 +1,13 @@
+    # Protect app directory from direct access
+    <IfModule mod_rewrite.c>
+        RewriteEngine On
+        RewriteCond %{REQUEST_URI} ^/app/
+        RewriteRule ^(.*)$ - [F,L]
+    </IfModule>
+
+    # Allow access to CSS and other assets
+    <FilesMatch "\.(css|js|jpg|jpeg|png|gif|pdf|ico)$">
+        Order Allow,Deny
+        Allow from all
+    </FilesMatch>
+

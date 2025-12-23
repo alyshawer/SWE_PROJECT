@@ -979,30 +979,6 @@ function updateAdminLastLogin($pdo, $user_id) {
     return $stmt->execute([$user_id]);
 }
 
-// Category functions (for Admin manageCategories)
-function getCategories($pdo) {
-    $sql = "SELECT * FROM categories ORDER BY name";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute();
-    return $stmt->fetchAll();
-}
 
-function createCategory($pdo, $name, $description) {
-    $sql = "INSERT INTO categories (name, description) VALUES (?, ?)";
-    $stmt = $pdo->prepare($sql);
-    return $stmt->execute([$name, $description]);
-}
-
-function updateCategory($pdo, $id, $name, $description) {
-    $sql = "UPDATE categories SET name = ?, description = ? WHERE id = ?";
-    $stmt = $pdo->prepare($sql);
-    return $stmt->execute([$name, $description, $id]);
-}
-
-function deleteCategory($pdo, $id) {
-    $sql = "DELETE FROM categories WHERE id = ?";
-    $stmt = $pdo->prepare($sql);
-    return $stmt->execute([$id]);
-}
 ?>
 

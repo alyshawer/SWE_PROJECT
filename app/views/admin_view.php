@@ -19,6 +19,7 @@
                 <a href="index.php?page=payments" class="btn">Monitor Transactions</a>
                 <a href="index.php?page=audit_logs" class="btn">Audit Logs</a>
                 <a href="index.php?page=admin&analytics=1" class="btn">Generate Analytics</a>
+                <a href="index.php?page=admin&action=users" class="btn">Manage Users</a>
             </div>
         </div>
         
@@ -83,22 +84,6 @@
                             <td><?php echo date('M j, Y', strtotime($user['created_at'])); ?></td>
                             <td>
                                 <?php if ($user['is_deletable']): ?>
-                                    <?php if (isset($user['isActive']) && $user['isActive']): ?>
-                                        <form method="POST" action="index.php?page=admin&action=suspend_user" style="display: inline;">
-                                            <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
-                                            <button type="submit" class="btn btn-warning btn-sm" 
-                                                    onclick="return confirm('Suspend this user?')">
-                                                Suspend
-                                            </button>
-                                        </form>
-                                    <?php else: ?>
-                                        <form method="POST" action="index.php?page=admin&action=activate_user" style="display: inline;">
-                                            <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
-                                            <button type="submit" class="btn btn-success btn-sm">
-                                                Activate
-                                            </button>
-                                        </form>
-                                    <?php endif; ?>
                                     <form method="POST" action="index.php?page=admin&action=delete_user" style="display: inline;">
                                         <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
                                         <button type="submit" name="delete_user" class="btn btn-danger btn-sm" 
@@ -157,61 +142,7 @@
         </div>
     </div>
     
-    <div class="admin-panel">
-        <h3>Category Management (UML: manageCategories)</h3>
-        <div class="card" style="margin-bottom: 20px;">
-            <h4>Create New Category</h4>
-            <form method="POST" action="index.php?page=admin&action=create_category">
-                <div class="form-group">
-                    <label>Category Name:</label>
-                    <input type="text" name="category_name" required>
-                </div>
-                <div class="form-group">
-                    <label>Description:</label>
-                    <textarea name="category_description"></textarea>
-                </div>
-                <button type="submit" name="create_category" class="btn">Create Category</button>
-            </form>
-        </div>
-        <div class="table">
-            <table style="width: 100%;">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Description</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($categories)): ?>
-                        <tr>
-                            <td colspan="5" style="text-align: center; padding: 30px;">No categories found.</td>
-                        </tr>
-                    <?php else: ?>
-                        <?php foreach ($categories as $category): ?>
-                            <tr>
-                                <td><?php echo $category['id']; ?></td>
-                                <td><?php echo htmlspecialchars($category['name']); ?></td>
-                                <td><?php echo htmlspecialchars($category['description'] ?? ''); ?></td>
-                                <td><?php echo $category['isActive'] ? 'Active' : 'Inactive'; ?></td>
-                                <td>
-                                        <form method="POST" action="index.php?page=admin&action=delete_category" style="display: inline;">
-                                        <input type="hidden" name="category_id" value="<?php echo $category['id']; ?>">
-                                        <button type="submit" name="delete_category" class="btn btn-danger btn-sm"
-                                                onclick="return confirm('Delete this category?')">
-                                            Delete
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
+
     
     <div class="admin-actions">
         <a href="index.php?page=dashboard" class="btn">Back to Dashboard</a>

@@ -24,8 +24,6 @@ class AdminController extends BaseController {
         }
         unset($job); // Break reference
         
-        $categories = getCategories($this->pdo);
-        
         $analytics = null;
         if (isset($_GET['analytics'])) {
             $admin = new AdminModel($_SESSION['user_id'], $_SESSION['username'], $_SESSION['email'], '', $_SESSION['type'], true);
@@ -41,7 +39,6 @@ class AdminController extends BaseController {
         $this->setPageTitle('Admin Panel');
         $this->setData('users', $users);
         $this->setData('jobs', $jobs);
-        $this->setData('categories', $categories);
         $this->setData('analytics', $analytics);
         $this->setData('recentTransactions', $recentTransactions);
         $this->render('admin');
@@ -111,36 +108,91 @@ class AdminController extends BaseController {
         $this->redirect('index.php?page=admin');
     }
     
-    public function createCategory() {
+
+
+    // Show separate Manage Users page where admin can add/remove users
+    public function users() {
         $this->requireAdmin();
-        
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $name = $_POST['category_name'] ?? '';
-            $description = $_POST['category_description'] ?? '';
-            
-            if (createCategory($this->pdo, $name, $description)) {
-                $_SESSION['success_message'] = 'Category created successfully!';
-            } else {
-                $_SESSION['error_message'] = 'Failed to create category.';
-            }
-        }
-        
-        $this->redirect('index.php?page=admin');
+
+        $users = getAllUsers($this->pdo);
+
+        $this->setPageTitle('Manage Users');
+        $this->setData('users', $users);
+        $this->render('admin_users');
     }
-    
-    public function deleteCategory() {
+
+    // Handle adding a new user from the Manage Users page
+    public function addUser() {
         $this->requireAdmin();
-        
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['category_id'])) {
-            $category_id = $_POST['category_id'];
-            if (deleteCategory($this->pdo, $category_id)) {
-                $_SESSION['success_message'] = 'Category deleted successfully!';
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $username = trim($_POST['username'] ?? '');
+            $email = trim($_POST['email'] ?? '');
+            $password = $_POST['password'] ?? '';
+            $type = $_POST['type'] ?? 'client';
+            $name = trim($_POST['name'] ?? '');
+            $phone = trim($_POST['phone'] ?? null);
+
+            $errors = [];
+
+            // Username validation and uniqueness
+            if (!validateUsername($username)) {
+                $errors[] = 'Invalid username. Use 3-20 alphanumeric characters or underscores.';
             } else {
-                $_SESSION['error_message'] = 'Failed to delete category.';
+                $stmt = $this->pdo->prepare('SELECT id FROM users WHERE username = ?');
+                $stmt->execute([$username]);
+                if ($stmt->fetch()) {
+                    $errors[] = 'Username already exists. Please choose a different one.';
+                }
+            }
+
+            // Email validation and uniqueness (accept any valid email format)
+            if (!validateEmail($email)) {
+                $errors[] = 'Invalid email address.';
+            } else {
+                $stmt = $this->pdo->prepare('SELECT id FROM users WHERE email = ?');
+                $stmt->execute([$email]);
+                if ($stmt->fetch()) {
+                    $errors[] = 'Email already exists. Please choose a different one.';
+                }
+            }
+
+            // Password & name validation
+            if (!validatePassword($password)) {
+                $errors[] = 'Password must be at least 8 characters, include upper/lowercase and a number.';
+            }
+            if (!validateName($name)) {
+                $errors[] = 'Invalid name.';
+            }
+            if (!empty($phone) && !validatePhone($phone)) {
+                $errors[] = 'Please enter a valid phone number.';
+            }
+
+            if (!empty($errors)) {
+                $_SESSION['error_message'] = implode(' ', $errors);
+                $this->redirect('index.php?page=admin&action=users');
+                return;
+            }
+
+            // Insert user
+            if (insertUser($this->pdo, $username, $email, $password, $type, $name, $phone)) {
+                // Ensure the created account is deletable (non-protected)
+                $newId = $this->pdo->lastInsertId();
+                try {
+                    $stmt = $this->pdo->prepare('UPDATE users SET is_deletable = 1 WHERE id = ?');
+                    $stmt->execute([$newId]);
+                } catch (Exception $e) {
+                    // ignore - not critical
+                }
+
+                logAuditAction($this->pdo, $_SESSION['user_id'], "User {$newId} created by admin");
+                $_SESSION['success_message'] = 'User created successfully!';
+            } else {
+                $_SESSION['error_message'] = 'Failed to create user. Email or username may already exist.';
             }
         }
-        
-        $this->redirect('index.php?page=admin');
+
+        $this->redirect('index.php?page=admin&action=users');
     }
 }
 ?>

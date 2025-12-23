@@ -112,19 +112,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['delete_user'])) {
         $routes['admin'] = ['AdminController', 'deleteUser'];
         $page = 'admin';
-    } elseif (isset($_POST['suspend_user'])) {
-        $routes['admin'] = ['AdminController', 'suspendUser'];
-        $page = 'admin';
-    } elseif (isset($_POST['activate_user'])) {
-        $routes['admin'] = ['AdminController', 'activateUser'];
-        $page = 'admin';
     } elseif (isset($_POST['delete_job']) && $page == 'admin') {
         $routes['admin'] = ['AdminController', 'deleteJob'];
-    } elseif (isset($_POST['create_category'])) {
-        $routes['admin'] = ['AdminController', 'createCategory'];
-        $page = 'admin';
-    } elseif (isset($_POST['delete_category'])) {
-        $routes['admin'] = ['AdminController', 'deleteCategory'];
+
+    } elseif (isset($_POST['add_user'])) {
+        // Route add user form to AdminController->addUser
+        $routes['admin'] = ['AdminController', 'addUser'];
         $page = 'admin';
     } elseif (isset($_POST['generate_report'])) {
         $routes['reports'] = ['ReportController', 'index'];

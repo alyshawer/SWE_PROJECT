@@ -39,13 +39,12 @@ require_once __DIR__ . '/../../helpers/view_helper.php';
             <?php if (isAdmin()): ?>
                 <a href="<?php echo base_url('index.php?page=admin'); ?>">Admin Panel</a>
                 <a href="<?php echo base_url('index.php?page=reports'); ?>">Reports</a>
-                <a href="<?php echo base_url('index.php?page=disputes'); ?>">Disputes</a>
                 <a href="<?php echo base_url('index.php?page=payments'); ?>">Payments</a>
                 <a href="<?php echo base_url('index.php?page=audit_logs'); ?>">Audit Logs</a>
             <?php elseif (in_array($_SESSION['type'], ['client', 'freelancer'])): ?>
-                <a href="<?php echo base_url('index.php?page=disputes'); ?>">Disputes</a>
             <?php endif; ?>
             
+            <a href="<?php echo base_url('index.php?page=profile'); ?>">My Profile</a>
             <a href="<?php echo base_url('index.php?page=logout'); ?>">Logout (<?php echo htmlspecialchars($_SESSION['username']); ?>)</a>
         <?php else: ?>
             <a href="<?php echo base_url('index.php?page=register'); ?>">Register</a>

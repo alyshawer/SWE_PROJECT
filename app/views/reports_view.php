@@ -18,7 +18,6 @@
                     <option value="users">Users Report</option>
                     <option value="projects">Projects Report</option>
                     <option value="payments">Payments Report</option>
-                    <option value="disputes">Disputes Report</option>
                 </select>
             </div>
             <button type="submit" name="generate_report" class="btn">Generate Report</button>

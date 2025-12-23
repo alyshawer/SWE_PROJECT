@@ -23,7 +23,7 @@
         </div>
         <div class="feature">
             <h3>Secure Platform</h3>
-            <p>Safe payments, dispute resolution, and professional environment</p>
+            <p>Safe payments and professional environment</p>
         </div>
     </div>
 </div>

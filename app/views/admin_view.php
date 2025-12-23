@@ -16,7 +16,6 @@
             <p>Access key admin features</p>
             <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
                 <a href="index.php?page=reports" class="btn">View Reports</a>
-                <a href="index.php?page=disputes" class="btn">Resolve Disputes</a>
                 <a href="index.php?page=payments" class="btn">Monitor Transactions</a>
                 <a href="index.php?page=audit_logs" class="btn">Audit Logs</a>
                 <a href="index.php?page=admin&analytics=1" class="btn">Generate Analytics</a>
@@ -30,7 +29,6 @@
                 <p><strong>Total Projects:</strong> <?php echo $analytics['total_projects']; ?></p>
                 <p><strong>Total Payments:</strong> <?php echo $analytics['total_payments']; ?></p>
                 <p><strong>Total Revenue:</strong> $<?php echo number_format($analytics['total_revenue'] ?? 0, 2); ?></p>
-                <p><strong>Pending Disputes:</strong> <?php echo $analytics['total_disputes']; ?></p>
                 <p><strong>Active Freelancers:</strong> <?php echo $analytics['active_freelancers']; ?></p>
                 <p><strong>Active Clients:</strong> <?php echo $analytics['active_clients']; ?></p>
             </div>
@@ -214,43 +212,6 @@
             </table>
         </div>
     </div>
-    
-    <?php if (!empty($pendingDisputes)): ?>
-        <div class="admin-panel">
-            <h3>Pending Disputes (UML: resolveDispute)</h3>
-            <div class="table">
-                <table style="width: 100%;">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Project</th>
-                            <th>Raised By</th>
-                            <th>Against</th>
-                            <th>Reason</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach (array_slice($pendingDisputes, 0, 5) as $dispute): ?>
-                            <tr>
-                                <td><?php echo $dispute['id']; ?></td>
-                                <td><?php echo htmlspecialchars($dispute['project_title']); ?></td>
-                                <td><?php echo htmlspecialchars($dispute['raised_by_name']); ?></td>
-                                <td><?php echo htmlspecialchars($dispute['against_name']); ?></td>
-                                <td><?php echo htmlspecialchars(substr($dispute['reason'], 0, 50)) . '...'; ?></td>
-                                <td>
-                                    <a href="index.php?page=disputes&id=<?php echo $dispute['id']; ?>" class="btn btn-sm">View</a>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-            <div style="margin-top: 10px;">
-                <a href="index.php?page=disputes" class="btn">View All Disputes</a>
-            </div>
-        </div>
-    <?php endif; ?>
     
     <div class="admin-actions">
         <a href="index.php?page=dashboard" class="btn">Back to Dashboard</a>

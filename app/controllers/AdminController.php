@@ -25,7 +25,6 @@ class AdminController extends BaseController {
         unset($job); // Break reference
         
         $categories = getCategories($this->pdo);
-        $pendingDisputes = getDisputes($this->pdo, 'pending');
         
         $analytics = null;
         if (isset($_GET['analytics'])) {
@@ -43,7 +42,6 @@ class AdminController extends BaseController {
         $this->setData('users', $users);
         $this->setData('jobs', $jobs);
         $this->setData('categories', $categories);
-        $this->setData('pendingDisputes', $pendingDisputes);
         $this->setData('analytics', $analytics);
         $this->setData('recentTransactions', $recentTransactions);
         $this->render('admin');

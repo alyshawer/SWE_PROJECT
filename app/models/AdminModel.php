@@ -70,18 +70,6 @@ class AdminModel extends UserModel {
         }
     }
     
-    // UML: +resolveDispute()
-    public function resolveDispute($pdo, $disputeId, $resolution) {
-        require_once __DIR__ . '/../helpers/db_functions.php';
-        $sql = "UPDATE disputes SET status = 'resolved', resolvedBy = ?, resolvedAt = NOW() WHERE id = ?";
-        $stmt = $pdo->prepare($sql);
-        if ($stmt->execute([$this->id, $disputeId])) {
-            logAuditAction($pdo, null, "Dispute {$disputeId} resolved by admin {$this->id}");
-            return true;
-        }
-        return false;
-    }
-    
     // UML: +systemConfig()
     public function systemConfig($pdo, $configKey, $configValue) {
         // In a real system, this would manage system configuration
@@ -99,7 +87,6 @@ class AdminModel extends UserModel {
             'total_users' => 0,
             'total_projects' => 0,
             'total_payments' => 0,
-            'total_disputes' => 0,
             'active_freelancers' => 0,
             'active_clients' => 0
         ];
@@ -139,11 +126,6 @@ class AdminModel extends UserModel {
             $analytics['total_payments'] = $result['count'] ?? 0;
             $analytics['total_revenue'] = 0; // Cannot calculate revenue without platform_fee column
         }
-        
-        $sql = "SELECT COUNT(*) as count FROM disputes WHERE status = 'pending'";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute();
-        $analytics['total_disputes'] = $stmt->fetch()['count'];
         
         $sql = "SELECT COUNT(*) as count FROM users WHERE type = 'freelancer' AND isActive = TRUE";
         $stmt = $pdo->prepare($sql);

@@ -23,9 +23,6 @@ class ReportController extends BaseController {
                 case 'payments':
                     $data = getPayments($this->pdo);
                     break;
-                case 'disputes':
-                    $data = getDisputes($this->pdo);
-                    break;
             }
             
             if (createReport($this->pdo, $type, $data, $_SESSION['user_id'])) {

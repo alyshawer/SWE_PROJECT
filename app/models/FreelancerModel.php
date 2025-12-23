@@ -4,7 +4,6 @@ require_once __DIR__ . '/UserModel.php';
 // UML: Freelancer class extends User (Model)
 class FreelancerModel extends UserModel {
     private $skills;
-    private $rating;
     private $totalEarned;
     private $completedProjects;
     private $hourlyRate;
@@ -12,10 +11,9 @@ class FreelancerModel extends UserModel {
     private $bio;
     private $availability;
     
-    public function __construct($id, $username, $email, $password, $role, $isActive, $skills = null, $rating = 0, $totalEarned = 0, $completedProjects = 0, $hourlyRate = null, $portfolioLink = null, $bio = null, $availability = 'available') {
+    public function __construct($id, $username, $email, $password, $role, $isActive, $skills = null, $totalEarned = 0, $completedProjects = 0, $hourlyRate = null, $portfolioLink = null, $bio = null, $availability = 'available') {
         parent::__construct($id, $username, $email, $password, $role, $isActive);
         $this->skills = $skills;
-        $this->rating = $rating;
         $this->totalEarned = $totalEarned;
         $this->completedProjects = $completedProjects;
         $this->hourlyRate = $hourlyRate;
@@ -100,34 +98,6 @@ class FreelancerModel extends UserModel {
         return $stmt->fetchAll();
     }
     
-    // Get freelancer's ratings
-    public function getRatings($pdo) {
-        $sql = "SELECT r.*, u.name as client_name, j.title as job_title
-                FROM ratings r 
-                JOIN users u ON r.client_id = u.id 
-                JOIN applications a ON r.application_id = a.id 
-                JOIN jobs j ON a.job_id = j.id 
-                WHERE r.freelancer_id = ? 
-                ORDER BY r.created_at DESC";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$this->id]);
-        return $stmt->fetchAll();
-    }
-    
-    // Get average rating
-    public function getAverageRating($pdo) {
-        $sql = "SELECT AVG(rating) as average_rating, COUNT(*) as total_ratings 
-                FROM ratings 
-                WHERE freelancer_id = ?";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$this->id]);
-        $result = $stmt->fetch();
-        if ($result && $result['average_rating']) {
-            $this->rating = round($result['average_rating'], 2);
-        }
-        return $result;
-    }
-    
     // Method to update earnings when payment is completed
     public function addEarnings($pdo, $amount) {
         $sql = "UPDATE freelancer_profiles SET totalEarned = totalEarned + ? WHERE user_id = ?";
@@ -163,7 +133,6 @@ class FreelancerModel extends UserModel {
     
     // Getters
     public function getSkills() { return $this->skills; }
-    public function getRating() { return $this->rating; }
     public function getTotalEarned() { return $this->totalEarned; }
     public function getCompletedProjects() { return $this->completedProjects; }
     public function getHourlyRate() { return $this->hourlyRate; }
@@ -183,13 +152,6 @@ class FreelancerModel extends UserModel {
         $data = $stmt->fetch();
         
         if ($data) {
-            // Get average rating
-            $ratingSql = "SELECT AVG(rating) as avg_rating FROM ratings WHERE freelancer_id = ?";
-            $ratingStmt = $pdo->prepare($ratingSql);
-            $ratingStmt->execute([$userId]);
-            $ratingData = $ratingStmt->fetch();
-            $rating = $ratingData['avg_rating'] ?? 0;
-            
             return new FreelancerModel(
                 $data['id'],
                 $data['username'],
@@ -198,7 +160,6 @@ class FreelancerModel extends UserModel {
                 $data['type'],
                 $data['isActive'] ?? true,
                 $data['skills'],
-                $rating,
                 $data['totalEarned'] ?? 0,
                 $data['completedProjects'] ?? 0,
                 $data['hourly_rate'],

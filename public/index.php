@@ -49,10 +49,10 @@ $routes = [
     'post_job' => ['JobController', 'create'],
     'apply_job' => ['JobController', 'apply'],
     'admin' => ['AdminController', 'index'],
-    'disputes' => ['DisputeController', 'index'],
     'reports' => ['ReportController', 'index'],
     'payments' => ['PaymentController', 'index'],
     'audit_logs' => ['AuditLogController', 'index'],
+    'profile' => ['ProfileController', 'index'],
 ];
 
 // Default to home if no page specified
@@ -72,6 +72,14 @@ if (isset($_GET['action'])) {
                 $routes[$page] = ['DashboardController', 'deleteJob'];
             } elseif ($action == 'edit_portfolio') {
                 $routes[$page] = ['DashboardController', 'editPortfolio'];
+            } elseif ($action == 'update_job_status') {
+                $routes[$page] = ['DashboardController', 'updateJobStatus'];
+            } elseif ($action == 'enter_payment_info') {
+                $routes[$page] = ['DashboardController', 'enterPaymentInfo'];
+            } elseif ($action == 'accept_offer') {
+                $routes[$page] = ['DashboardController', 'acceptOffer'];
+            } elseif ($action == 'reject_offer') {
+                $routes[$page] = ['DashboardController', 'rejectOffer'];
             }
             break;
         case 'freelancers':
@@ -79,11 +87,9 @@ if (isset($_GET['action'])) {
                 $routes[$page] = ['FreelancersController', 'profile'];
             }
             break;
-        case 'disputes':
-            if ($action == 'create') {
-                $routes[$page] = ['DisputeController', 'create'];
-            } elseif ($action == 'resolve') {
-                $routes[$page] = ['DisputeController', 'resolve'];
+        case 'profile':
+            if ($action == 'edit') {
+                $routes[$page] = ['ProfileController', 'edit'];
             }
             break;
         case 'reports':
@@ -120,12 +126,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['delete_category'])) {
         $routes['admin'] = ['AdminController', 'deleteCategory'];
         $page = 'admin';
-    } elseif (isset($_POST['raise_dispute'])) {
-        $routes['disputes'] = ['DisputeController', 'create'];
-        $page = 'disputes';
-    } elseif (isset($_POST['resolve_dispute'])) {
-        $routes['disputes'] = ['DisputeController', 'resolve'];
-        $page = 'disputes';
     } elseif (isset($_POST['generate_report'])) {
         $routes['reports'] = ['ReportController', 'index'];
         $page = 'reports';
@@ -145,6 +145,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Route job page POST to JobController->updateApplicationStatus
         $routes['job'] = ['JobController', 'updateApplicationStatus'];
         $page = 'job';
+    } elseif (isset($_POST['job_status'])) {
+        // Route dashboard POST to DashboardController->updateJobStatus
+        $routes['dashboard'] = ['DashboardController', 'updateJobStatus'];
+        $page = 'dashboard';
+    } elseif (isset($_POST['accept_offer']) || (isset($_GET['action']) && $_GET['action'] == 'accept_offer')) {
+        $routes['dashboard'] = ['DashboardController', 'acceptOffer'];
+        $page = 'dashboard';
+    } elseif (isset($_POST['reject_offer']) || (isset($_GET['action']) && $_GET['action'] == 'reject_offer')) {
+        $routes['dashboard'] = ['DashboardController', 'rejectOffer'];
+        $page = 'dashboard';
+    } elseif (isset($_POST['update_profile'])) {
+        $routes['profile'] = ['ProfileController', 'edit'];
+        $page = 'profile';
     }
 }
 

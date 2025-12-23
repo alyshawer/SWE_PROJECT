@@ -153,18 +153,78 @@ function deleteUser($pdo, $user_id) {
 
 function deleteJob($pdo, $job_id, $user_id = null) {
     $pdo = db_get_pdo($pdo);
-    $sql = "DELETE FROM jobs WHERE id = ?";
-    $params = [$job_id];
     
-    // If user_id provided, only allow deletion by job owner or admin
-    if ($user_id) {
-        $sql .= " AND (client_id = ? OR ? IN (SELECT id FROM users WHERE type = 'admin'))";
-        $params[] = $user_id;
-        $params[] = $_SESSION['user_id'];
+    try {
+        // Verify job exists and user has permission
+        $sql_check = "SELECT client_id FROM jobs WHERE id = ?";
+        $stmt_check = $pdo->prepare($sql_check);
+        $stmt_check->execute([$job_id]);
+        $job = $stmt_check->fetch();
+        
+        if (!$job) {
+            return false; // Job doesn't exist
+        }
+        
+        // Check permission if user_id provided
+        if ($user_id && $job['client_id'] != $user_id) {
+            // Check if user is admin
+            $sql_admin = "SELECT id FROM users WHERE id = ? AND type = 'admin'";
+            $stmt_admin = $pdo->prepare($sql_admin);
+            $stmt_admin->execute([$_SESSION['user_id'] ?? 0]);
+            if (!$stmt_admin->fetch()) {
+                return false; // Not owner and not admin
+            }
+        }
+        
+        // Check if job has pending or completed payments
+        $sql_payment = "SELECT id FROM payments WHERE projectId = ? AND status IN ('pending', 'completed')";
+        $stmt_payment = $pdo->prepare($sql_payment);
+        $stmt_payment->execute([$job_id]);
+        if ($stmt_payment->fetch()) {
+            return false; // Cannot delete job with payments
+        }
+        
+        // Check if job has accepted/completed applications
+        $sql_app = "SELECT id FROM applications WHERE job_id = ? AND status = 'accepted' AND job_status NOT IN ('canceled')";
+        $stmt_app = $pdo->prepare($sql_app);
+        $stmt_app->execute([$job_id]);
+        if ($stmt_app->fetch()) {
+            return false; // Cannot delete job with active/accepted applications
+        }
+        
+        // Start transaction for cascading deletes
+        $pdo->beginTransaction();
+        
+        // Delete related records first (due to foreign key constraints)
+        // Delete applications
+        $sql_del_app = "DELETE FROM applications WHERE job_id = ?";
+        $stmt_del_app = $pdo->prepare($sql_del_app);
+        $stmt_del_app->execute([$job_id]);
+        
+        // Delete the job
+        $sql = "DELETE FROM jobs WHERE id = ?";
+        $stmt = $pdo->prepare($sql);
+        $result = $stmt->execute([$job_id]);
+        
+        if ($result) {
+            $pdo->commit();
+            return true;
+        } else {
+            $pdo->rollBack();
+            return false;
+        }
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) {
+            try {
+                $pdo->rollBack();
+            } catch (Exception $rollbackEx) {
+                error_log("Rollback failed: " . $rollbackEx->getMessage());
+            }
+        }
+        error_log("Error deleting job {$job_id}: " . $e->getMessage());
+        error_log("PDO Error Info: " . print_r($pdo->errorInfo(), true));
+        return false;
     }
-    
-    $stmt = $pdo->prepare($sql);
-    return $stmt->execute($params);
 }
 
 function getUserJobs($pdo, $user_id) {
@@ -272,12 +332,12 @@ function getUserWithProfile($pdo, $user_id) {
 }
 
 // Offer functions
-function createOffer($pdo, $client_id, $freelancer_id, $job_id, $amount, $message = '') {
+function createOffer($pdo, $client_id, $freelancer_id, $title, $description, $budget, $completion_time = '') {
     $pdo = db_get_pdo($pdo);
-    $sql = "INSERT INTO offers (client_id, freelancer_id, job_id, amount, message, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', NOW())";
+    $sql = "INSERT INTO offers (client_id, freelancer_id, title, description, budget, completion_time, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())";
     $stmt = $pdo->prepare($sql);
-    if ($stmt->execute([$client_id, $freelancer_id, $job_id, $amount, $message])) {
-        logAuditAction($pdo, $client_id, "Offer created for freelancer {$freelancer_id} on job {$job_id}");
+    if ($stmt->execute([$client_id, $freelancer_id, $title, $description, $budget, $completion_time])) {
+        logAuditAction($pdo, $client_id, "Offer created for freelancer {$freelancer_id}: {$title}");
         return $pdo->lastInsertId();
     }
     return false;
@@ -300,6 +360,107 @@ function updateOfferStatus($pdo, $offer_id, $status) {
     $sql = "UPDATE offers SET status = ? WHERE id = ?";
     $stmt = $pdo->prepare($sql);
     return $stmt->execute([$status, $offer_id]);
+}
+
+/**
+ * Accept an offer - creates a job and application, then marks offer as accepted
+ * Returns the application_id on success, false on failure
+ */
+function acceptOffer($pdo, $offer_id, $freelancer_id) {
+    $pdo = db_get_pdo($pdo);
+    
+    try {
+        $pdo->beginTransaction();
+        
+        // Get offer details
+        $sql = "SELECT * FROM offers WHERE id = ? AND freelancer_id = ? AND status = 'pending'";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$offer_id, $freelancer_id]);
+        $offer = $stmt->fetch();
+        
+        if (!$offer) {
+            $pdo->rollBack();
+            return false;
+        }
+        
+        // Create a job from the offer
+        $sql_job = "INSERT INTO jobs (title, description, budget, client_id, status, created_at) VALUES (?, ?, ?, ?, 'in_progress', NOW())";
+        $stmt_job = $pdo->prepare($sql_job);
+        $stmt_job->execute([$offer['title'], $offer['description'], $offer['budget'], $offer['client_id']]);
+        $job_id = $pdo->lastInsertId();
+        
+        if (!$job_id) {
+            $pdo->rollBack();
+            return false;
+        }
+        
+        // Create an application for this job (automatically accepted)
+        // Use offer description as proposal
+        $sql_app = "INSERT INTO applications (job_id, freelancer_id, proposal, completion_time, bid_amount, status, job_status, started_at, created_at) 
+                    VALUES (?, ?, ?, ?, ?, 'accepted', 'in_progress', NOW(), NOW())";
+        $stmt_app = $pdo->prepare($sql_app);
+        $proposal = "Accepted direct offer from client. " . ($offer['description'] ?? '');
+        $stmt_app->execute([
+            $job_id, 
+            $freelancer_id, 
+            $proposal, 
+            $offer['completion_time'], 
+            $offer['budget']
+        ]);
+        $application_id = $pdo->lastInsertId();
+        
+        if (!$application_id) {
+            $pdo->rollBack();
+            return false;
+        }
+        
+        // Update offer status to accepted
+        $sql_offer = "UPDATE offers SET status = 'accepted' WHERE id = ?";
+        $stmt_offer = $pdo->prepare($sql_offer);
+        $stmt_offer->execute([$offer_id]);
+        
+        $pdo->commit();
+        return $application_id;
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log("Error accepting offer {$offer_id}: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Reject an offer - updates offer status to rejected
+ */
+function rejectOffer($pdo, $offer_id, $freelancer_id) {
+    $pdo = db_get_pdo($pdo);
+    
+    // Verify offer belongs to freelancer and is pending
+    $sql = "SELECT id FROM offers WHERE id = ? AND freelancer_id = ? AND status = 'pending'";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$offer_id, $freelancer_id]);
+    if (!$stmt->fetch()) {
+        return false;
+    }
+    
+    $sql = "UPDATE offers SET status = 'rejected' WHERE id = ?";
+    $stmt = $pdo->prepare($sql);
+    return $stmt->execute([$offer_id]);
+}
+
+/**
+ * Get offer by ID with details
+ */
+function getOfferById($pdo, $offer_id) {
+    $pdo = db_get_pdo($pdo);
+    $sql = "SELECT o.*, u.name as client_name, u.email as client_email 
+            FROM offers o 
+            JOIN users u ON o.client_id = u.id 
+            WHERE o.id = ?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$offer_id]);
+    return $stmt->fetch();
 }
 
 // Application management functions
@@ -472,6 +633,22 @@ function updateUser($pdo, $user_id, $username, $email, $name, $phone) {
     return $stmt->execute([$username, $email, $name, $phone, $user_id]);
 }
 
+function updateUserPassword($pdo, $user_id, $new_password) {
+    $pdo = db_get_pdo($pdo);
+    $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+    $sql = "UPDATE users SET password = ? WHERE id = ?";
+    $stmt = $pdo->prepare($sql);
+    return $stmt->execute([$hashed_password, $user_id]);
+}
+
+function getUserById($pdo, $user_id) {
+    $pdo = db_get_pdo($pdo);
+    $sql = "SELECT * FROM users WHERE id = ?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$user_id]);
+    return $stmt->fetch();
+}
+
 // Job status management functions
 function updateApplicationJobStatus($pdo, $application_id, $job_status) {
     $pdo = db_get_pdo($pdo);
@@ -502,60 +679,6 @@ function getApplicationWithJobStatus($pdo, $application_id) {
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$application_id]);
     return $stmt->fetch();
-}
-
-// Rating functions
-function createRating($pdo, $application_id, $client_id, $freelancer_id, $rating, $review) {
-    $pdo = db_get_pdo($pdo);
-    $sql = "INSERT INTO ratings (application_id, client_id, freelancer_id, rating, review, created_at) VALUES (?, ?, ?, ?, ?, NOW())";
-    $stmt = $pdo->prepare($sql);
-    return $stmt->execute([$application_id, $client_id, $freelancer_id, $rating, $review]);
-}
-
-function getFreelancerRatings($pdo, $freelancer_id) {
-    $pdo = db_get_pdo($pdo);
-    $sql = "SELECT r.*, u.name as client_name, j.title as job_title
-            FROM ratings r 
-            JOIN users u ON r.client_id = u.id 
-            JOIN applications a ON r.application_id = a.id 
-            JOIN jobs j ON a.job_id = j.id 
-            WHERE r.freelancer_id = ? 
-            ORDER BY r.created_at DESC";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$freelancer_id]);
-    return $stmt->fetchAll();
-}
-
-function getFreelancerAverageRating($pdo, $freelancer_id) {
-    $pdo = db_get_pdo($pdo);
-    $sql = "SELECT AVG(rating) as average_rating, COUNT(*) as total_ratings 
-            FROM ratings 
-            WHERE freelancer_id = ?";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$freelancer_id]);
-    return $stmt->fetch();
-}
-
-function hasRatedApplication($pdo, $application_id) {
-    $pdo = db_get_pdo($pdo);
-    $sql = "SELECT id FROM ratings WHERE application_id = ?";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$application_id]);
-    return $stmt->fetch() ? true : false;
-}
-
-function getApplicationsForRating($pdo, $client_id) {
-    $pdo = db_get_pdo($pdo);
-    $sql = "SELECT a.*, j.title as job_title, u.name as freelancer_name, u.email as freelancer_email
-            FROM applications a 
-            JOIN jobs j ON a.job_id = j.id 
-            JOIN users u ON a.freelancer_id = u.id 
-            WHERE j.client_id = ? AND a.status = 'accepted' AND a.job_status = 'completed'
-            AND a.id NOT IN (SELECT application_id FROM ratings WHERE application_id IS NOT NULL)
-            ORDER BY a.completed_at DESC";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$client_id]);
-    return $stmt->fetchAll();
 }
 
 // Report functions (UML: Report class)
@@ -623,73 +746,14 @@ function getAuditLogs($pdo, $userId = null, $limit = 100) {
     return $stmt->fetchAll();
 }
 
-// Dispute functions (UML: Dispute class)
-function createDispute($pdo, $projectId, $raisedBy, $against, $reason) {
-    $pdo = db_get_pdo($pdo);
-    $sql = "INSERT INTO disputes (projectId, raisedBy, against, reason, status) VALUES (?, ?, ?, ?, 'pending')";
-    $stmt = $pdo->prepare($sql);
-    if ($stmt->execute([$projectId, $raisedBy, $against, $reason])) {
-        logAuditAction($pdo, $raisedBy, "Dispute raised for project {$projectId}");
-        return $pdo->lastInsertId();
-    }
-    return false;
-}
-
-function getDisputes($pdo, $status = null) {
-    $pdo = db_get_pdo($pdo);
-    if ($status) {
-        $sql = "SELECT d.*, j.title as project_title, u1.name as raised_by_name, u2.name as against_name 
-                FROM disputes d 
-                JOIN jobs j ON d.projectId = j.id 
-                JOIN users u1 ON d.raisedBy = u1.id 
-                JOIN users u2 ON d.against = u2.id 
-                WHERE d.status = ? 
-                ORDER BY d.createdAt DESC";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$status]);
-    } else {
-        $sql = "SELECT d.*, j.title as project_title, u1.name as raised_by_name, u2.name as against_name 
-                FROM disputes d 
-                JOIN jobs j ON d.projectId = j.id 
-                JOIN users u1 ON d.raisedBy = u1.id 
-                JOIN users u2 ON d.against = u2.id 
-                ORDER BY d.createdAt DESC";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute();
-    }
-    return $stmt->fetchAll();
-}
-
-function getDisputeById($pdo, $id) {
-    $pdo = db_get_pdo($pdo);
-    $sql = "SELECT d.*, j.title as project_title, u1.name as raised_by_name, u2.name as against_name 
-            FROM disputes d 
-            JOIN jobs j ON d.projectId = j.id 
-            JOIN users u1 ON d.raisedBy = u1.id 
-            JOIN users u2 ON d.against = u2.id 
-            WHERE d.id = ?";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([$id]);
-    return $stmt->fetch();
-}
-
-function resolveDispute($pdo, $disputeId, $resolvedBy) {
-    $pdo = db_get_pdo($pdo);
-    $sql = "UPDATE disputes SET status = 'resolved', resolvedBy = ?, resolvedAt = NOW() WHERE id = ?";
-    $stmt = $pdo->prepare($sql);
-    if ($stmt->execute([$resolvedBy, $disputeId])) {
-        logAuditAction($pdo, $resolvedBy, "Dispute {$disputeId} resolved");
-        return true;
-    }
-    return false;
-}
-
 // Payment functions (UML: Payment class)
-function createPayment($pdo, $projectId, $clientId, $freelancerId, $amount, $paymentMethod = 'online') {
-    $sql = "INSERT INTO payments (projectId, clientId, freelancerId, amount, status, paymentMethod) 
-            VALUES (?, ?, ?, ?, 'pending', ?)";
+function createPayment($pdo, $projectId, $clientId, $freelancerId, $amount, $paymentMethod = 'online', $freelancerAccount = null) {
+    $pdo = db_get_pdo($pdo);
+    // Store freelancer account in transactionId field (PayPal email or bank account details)
+    $sql = "INSERT INTO payments (projectId, clientId, freelancerId, amount, status, paymentMethod, transactionId) 
+            VALUES (?, ?, ?, ?, 'pending', ?, ?)";
     $stmt = $pdo->prepare($sql);
-    if ($stmt->execute([$projectId, $clientId, $freelancerId, $amount, $paymentMethod])) {
+    if ($stmt->execute([$projectId, $clientId, $freelancerId, $amount, $paymentMethod, $freelancerAccount])) {
         return $pdo->lastInsertId();
     }
     return false;
@@ -738,7 +802,10 @@ function completePayment($pdo, $paymentId, $transactionId = null) {
     // Compute platform fee (default 10%) and update records atomically
     $pdo = db_get_pdo($pdo);
     $payment = getPaymentById($pdo, $paymentId);
-    if (!$payment) return false;
+    if (!$payment) {
+        error_log("Payment not found: {$paymentId}");
+        return false;
+    }
 
     $amount = (float)$payment['amount'];
     $feeRate = 0.10; // TODO: read from config
@@ -748,37 +815,130 @@ function completePayment($pdo, $paymentId, $transactionId = null) {
     try {
         $pdo->beginTransaction();
 
-        $sql = "UPDATE payments SET status = 'completed', transactionId = ?, completedAt = NOW(), platform_fee = ? WHERE id = ?";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([$transactionId, $platformFee, $paymentId]);
+        // If transactionId is provided, update it; otherwise keep the existing freelancer account info
+        // Since we're storing freelancer account in transactionId during creation, we need to preserve it
+        // if no new transactionId is provided
+        $existingTransactionId = $payment['transactionId'] ?? null;
+        
+        // Determine final transaction ID: use new one if provided, otherwise keep existing
+        // If both are null/empty, that's fine - it means it's an online payment without account info
+        if ($transactionId !== null && $transactionId !== '' && trim($transactionId) !== '') {
+            $finalTransactionId = trim($transactionId);
+        } elseif ($existingTransactionId !== null && $existingTransactionId !== '' && trim($existingTransactionId) !== '') {
+            $finalTransactionId = trim($existingTransactionId);
+        } else {
+            $finalTransactionId = null; // NULL is allowed for online payments
+        }
+        
+        // Try to update with platform_fee first (if column exists)
+        // If it fails due to missing column, update without it
+        try {
+            $sql = "UPDATE payments SET status = 'completed', transactionId = ?, completedAt = NOW(), platform_fee = ? WHERE id = ?";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$finalTransactionId, $platformFee, $paymentId]);
+        } catch (PDOException $e) {
+            // Check if error is due to missing column 'platform_fee'
+            if (strpos($e->getMessage(), 'platform_fee') !== false || $e->getCode() == '42S22') {
+                // Column doesn't exist, try update without platform_fee
+                error_log("platform_fee column not found, updating payment without it");
+                $sql = "UPDATE payments SET status = 'completed', transactionId = ?, completedAt = NOW() WHERE id = ?";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([$finalTransactionId, $paymentId]);
+            } else {
+                // Re-throw if it's a different error
+                throw $e;
+            }
+        }
 
         // Update freelancer earnings (add net amount)
-        $sql2 = "UPDATE freelancer_profiles SET totalEarned = COALESCE(totalEarned,0) + ? WHERE user_id = ?";
-        $stmt2 = $pdo->prepare($sql2);
-        $stmt2->execute([$freelancerNet, $payment['freelancerId']]);
+        // First check if profile exists, if not create it
+        $sql_check = "SELECT id FROM freelancer_profiles WHERE user_id = ? LIMIT 1";
+        $stmt_check = $pdo->prepare($sql_check);
+        if (!$stmt_check) {
+            throw new Exception("Failed to prepare profile check: " . implode(", ", $pdo->errorInfo()));
+        }
+        $stmt_check->execute([$payment['freelancerId']]);
+        $profileExists = $stmt_check->fetch();
+        
+        if (!$profileExists) {
+            // Create profile if it doesn't exist
+            $sql_create = "INSERT INTO freelancer_profiles (user_id, totalEarned) VALUES (?, ?)";
+            $stmt_create = $pdo->prepare($sql_create);
+            if (!$stmt_create) {
+                throw new Exception("Failed to prepare profile creation: " . implode(", ", $pdo->errorInfo()));
+            }
+            $result_create = $stmt_create->execute([$payment['freelancerId'], $freelancerNet]);
+            if (!$result_create) {
+                throw new Exception("Failed to create freelancer profile: " . implode(", ", $stmt_create->errorInfo()));
+            }
+        } else {
+            // Update existing profile
+            $sql2 = "UPDATE freelancer_profiles SET totalEarned = COALESCE(totalEarned,0) + ? WHERE user_id = ?";
+            $stmt2 = $pdo->prepare($sql2);
+            if (!$stmt2) {
+                throw new Exception("Failed to prepare earnings update: " . implode(", ", $pdo->errorInfo()));
+            }
+            $result2 = $stmt2->execute([$freelancerNet, $payment['freelancerId']]);
+            if (!$result2) {
+                throw new Exception("Failed to update freelancer earnings: " . implode(", ", $stmt2->errorInfo()));
+            }
+        }
 
         // Increment platform revenue stored in system_config under key 'platform_revenue'
-        $sql3 = "SELECT config_value FROM system_config WHERE config_key = 'platform_revenue' LIMIT 1";
-        $stmt3 = $pdo->prepare($sql3);
-        $stmt3->execute();
-        $row = $stmt3->fetch();
-        if ($row && is_numeric($row['config_value'])) {
-            $newTotal = round((float)$row['config_value'] + $platformFee, 2);
-            $sql4 = "UPDATE system_config SET config_value = ?, updated_at = NOW() WHERE config_key = 'platform_revenue'";
-            $stmt4 = $pdo->prepare($sql4);
-            $stmt4->execute([$newTotal]);
-        } else {
-            $sql4 = "INSERT INTO system_config (config_key, config_value, updated_at) VALUES ('platform_revenue', ?, NOW())";
-            $stmt4 = $pdo->prepare($sql4);
-            $stmt4->execute([$platformFee]);
+        // Wrap in try-catch to not fail payment if revenue tracking fails
+        try {
+            $sql3 = "SELECT config_value FROM system_config WHERE config_key = 'platform_revenue' LIMIT 1";
+            $stmt3 = $pdo->prepare($sql3);
+            if ($stmt3) {
+                $stmt3->execute();
+                $row = $stmt3->fetch();
+                if ($row && is_numeric($row['config_value'])) {
+                    $newTotal = round((float)$row['config_value'] + $platformFee, 2);
+                    $sql4 = "UPDATE system_config SET config_value = ?, updated_at = NOW() WHERE config_key = 'platform_revenue'";
+                    $stmt4 = $pdo->prepare($sql4);
+                    if ($stmt4) {
+                        $stmt4->execute([$newTotal]);
+                    }
+                } else {
+                    $sql4 = "INSERT INTO system_config (config_key, config_value, updated_at) VALUES ('platform_revenue', ?, NOW())";
+                    $stmt4 = $pdo->prepare($sql4);
+                    if ($stmt4) {
+                        $stmt4->execute([$platformFee]);
+                    }
+                }
+            }
+        } catch (Exception $revenueEx) {
+            // Log but don't fail the payment if revenue tracking fails
+            error_log("Platform revenue tracking failed (non-critical): " . $revenueEx->getMessage());
         }
 
         $pdo->commit();
 
         logAuditAction($pdo, $payment['clientId'], "Payment completed for project {$payment['projectId']}; fee={$platformFee}");
         return true;
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) {
+            try {
+                $pdo->rollBack();
+            } catch (Exception $rollbackEx) {
+                error_log("Rollback failed: " . $rollbackEx->getMessage());
+            }
+        }
+        $errorMsg = "Payment completion error for payment {$paymentId}: " . $e->getMessage();
+        error_log($errorMsg);
+        error_log("PDO Error Info: " . print_r($pdo->errorInfo(), true));
+        return false;
     } catch (Exception $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        if ($pdo->inTransaction()) {
+            try {
+                $pdo->rollBack();
+            } catch (Exception $rollbackEx) {
+                error_log("Rollback failed: " . $rollbackEx->getMessage());
+            }
+        }
+        $errorMsg = "Payment completion error for payment {$paymentId}: " . $e->getMessage();
+        error_log($errorMsg);
+        error_log("Stack trace: " . $e->getTraceAsString());
         return false;
     }
 }

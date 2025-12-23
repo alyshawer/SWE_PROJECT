@@ -11,13 +11,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
       - name: Setup PHP
-        uses: shivammathur/setup-php@v4
+        uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: mbstring, pdo_sqlite, sqlite3, zip
-      - name: Install Composer
-        run: composer install --no-progress --no-suggest
-      - name: Run tests
-        run: composer test
+          extensions: mbstring, pdo, pdo_mysql, sqlite3, zip
+          coverage: none
+      
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-
+      
+      - name: Install dependencies
+        run: composer install --no-progress --no-interaction --prefer-dist
+      
+      - name: Run PHPUnit tests
+        run: vendor/bin/phpunit --colors=always

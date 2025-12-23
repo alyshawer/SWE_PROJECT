@@ -42,13 +42,29 @@ SWE_PROJECT/
 4. **Run locally**: Visit http://localhost/SWE_PROJECT
 
 ## Running Tests
-1. **Run all tests**:
-   ```powershell
-   composer test
-   # or
-   & "C:\xampp\php\php.exe" "vendor\bin\phpunit" --testdox --colors=always
-   ```
-2. **Test output**: All tests should pass (13 tests, 48 assertions). See below for details.
+
+### Local Testing (Development)
+Run tests on your local machine:
+```powershell
+# Quick test run
+composer test
+
+# Detailed output
+& "C:\xampp\php\php.exe" "vendor\bin\phpunit" --testdox --colors=always
+
+# Run specific test file
+& "C:\xampp\php\php.exe" "vendor\bin\phpunit" tests/AuthControllerTest.php
+```
+
+### GitHub Actions (CI/CD)
+Tests automatically run on push/PR:
+- Go to **Actions** tab in GitHub
+- Tests run on Ubuntu with PHP 8.2
+- Same test suite as local (SQLite in-memory)
+
+**Both environments work together!** Test locally first, then GitHub Actions verifies on push.
+
+See `TESTING_GUIDE.md` for detailed instructions.
 
 ## Test Coverage — What’s Tested
 

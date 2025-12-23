@@ -39,7 +39,7 @@ class JobController extends BaseController {
         
         $errors = [];
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $title = trim($_POST['title'] ?? '');
             $description = trim($_POST['description'] ?? '');
             $budget = $_POST['budget'] ?? 0;
@@ -80,7 +80,7 @@ class JobController extends BaseController {
             $this->redirect('index.php?page=jobs');
         }
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $job_id = $_POST['job_id'] ?? 0;
             $proposal = trim($_POST['proposal'] ?? '');
             $completion_time = trim($_POST['completion_time'] ?? '');
@@ -104,7 +104,7 @@ class JobController extends BaseController {
     public function updateApplicationStatus() {
         $this->requireLogin();
 
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && isset($_POST['status'])) {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['application_id']) && isset($_POST['status'])) {
             $application_id = $_POST['application_id'];
             $status = $_POST['status'];
 

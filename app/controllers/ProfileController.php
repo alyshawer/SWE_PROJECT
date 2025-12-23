@@ -49,7 +49,7 @@ class ProfileController extends BaseController {
         
         $errors = [];
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $username = trim($_POST['username'] ?? '');
             $email = trim($_POST['email'] ?? '');
             $name = trim($_POST['name'] ?? '');

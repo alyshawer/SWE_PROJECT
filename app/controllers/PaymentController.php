@@ -95,7 +95,7 @@ class PaymentController extends BaseController {
             $this->redirect('index.php?page=payments');
         }
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $projectId = $_POST['project_id'] ?? 0;
             $freelancerId = $_POST['freelancer_id'] ?? 0;
             $amount = $_POST['amount'] ?? 0;
@@ -118,7 +118,7 @@ class PaymentController extends BaseController {
     public function complete() {
         $this->requireLogin();
         
-            if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['payment_id'])) {
+            if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['payment_id'])) {
             $paymentId = $_POST['payment_id'];
             $transactionId = trim($_POST['transaction_id'] ?? '');
             if (empty($transactionId)) {

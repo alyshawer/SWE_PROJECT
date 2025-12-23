@@ -10,7 +10,7 @@ class FreelancersController extends BaseController {
         $user = $this->getCurrentUser();
 
         // Handle sending offers (only for clients)
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_offer']) && $user['type'] == 'client') {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['send_offer']) && $user['type'] == 'client') {
             $freelancer_id = $_POST['freelancer_id'] ?? null;
             $title = trim($_POST['title'] ?? '');
             $description = trim($_POST['description'] ?? '');

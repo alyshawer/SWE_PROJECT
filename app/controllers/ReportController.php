@@ -9,7 +9,7 @@ class ReportController extends BaseController {
         
         $reports = getReports($this->pdo, $_SESSION['user_id']);
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate_report'])) {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['generate_report'])) {
             $type = $_POST['report_type'] ?? '';
             $data = [];
             

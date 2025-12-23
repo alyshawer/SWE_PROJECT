@@ -47,7 +47,7 @@ class AdminController extends BaseController {
     public function deleteUser() {
         $this->requireAdmin();
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id'])) {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['user_id'])) {
             $user_id = $_POST['user_id'];
             if (deleteUser($this->pdo, $user_id)) {
                 logAuditAction($this->pdo, $_SESSION['user_id'], "User {$user_id} deleted by admin");
@@ -63,7 +63,7 @@ class AdminController extends BaseController {
     public function suspendUser() {
         $this->requireAdmin();
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id'])) {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['user_id'])) {
             $user_id = $_POST['user_id'];
             $admin = new AdminModel($_SESSION['user_id'], $_SESSION['username'], $_SESSION['email'], '', $_SESSION['type'], true);
             if ($admin->suspendAccount($this->pdo, $user_id)) {
@@ -79,7 +79,7 @@ class AdminController extends BaseController {
     public function activateUser() {
         $this->requireAdmin();
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_id'])) {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['user_id'])) {
             $user_id = $_POST['user_id'];
             $sql = "UPDATE users SET isActive = TRUE WHERE id = ?";
             $stmt = $this->pdo->prepare($sql);
@@ -95,7 +95,7 @@ class AdminController extends BaseController {
     public function deleteJob() {
         $this->requireAdmin();
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['job_id'])) {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['job_id'])) {
             $job_id = $_POST['job_id'];
             if (deleteJob($this->pdo, $job_id)) {
                 logAuditAction($this->pdo, $_SESSION['user_id'], "Job {$job_id} deleted by admin");
@@ -125,7 +125,7 @@ class AdminController extends BaseController {
     public function addUser() {
         $this->requireAdmin();
 
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $username = trim($_POST['username'] ?? '');
             $email = trim($_POST['email'] ?? '');
             $password = $_POST['password'] ?? '';

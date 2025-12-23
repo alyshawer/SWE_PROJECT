@@ -7,8 +7,29 @@ class Database {
     private static $instance = null;
     private $pdo;
 
-    private function __construct() {
-        // Load config from config file or environment - match existing defaults
+    /**
+     * Accept an optional PDO for easier testing. If no PDO provided, build from env or defaults.
+     */
+    public function __construct(PDO $pdo = null) {
+        if ($pdo !== null) {
+            $this->pdo = $pdo;
+            $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            return;
+        }
+
+        // Allow configuring DSN via DB_DSN env var (e.g., sqlite::memory: for tests)
+        $dsn = getenv('DB_DSN');
+        if ($dsn) {
+            try {
+                $this->pdo = new PDO($dsn);
+                $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                return;
+            } catch (PDOException $e) {
+                die('Database connection failed: ' . $e->getMessage());
+            }
+        }
+
+        // Fallback to defaults used by the app (MySQL)
         $host = 'localhost';
         $dbname = 'freelance_db';
         $username = 'root';
@@ -18,7 +39,6 @@ class Database {
             $this->pdo = new PDO("mysql:host={$host};dbname={$dbname}", $username, $password);
             $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         } catch (PDOException $e) {
-            // In CLI/dev show error; in production this should be handled more gracefully
             die('Database connection failed: ' . $e->getMessage());
         }
     }
@@ -37,6 +57,11 @@ class Database {
             self::$instance = new Database();
         }
         return self::$instance;
+    }
+
+    // Helper to set a PDO instance for testing
+    public static function setInstanceForTesting(PDO $pdo) {
+        self::$instance = new Database($pdo);
     }
 
     // Return PDO connection

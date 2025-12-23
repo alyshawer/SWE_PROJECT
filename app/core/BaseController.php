@@ -59,10 +59,10 @@ abstract class BaseController {
         if (isset($_SESSION['user_id'])) {
             return [
                 'id' => $_SESSION['user_id'],
-                'username' => $_SESSION['username'],
-                'email' => $_SESSION['email'],
-                'type' => $_SESSION['type'],
-                'name' => $_SESSION['name']
+                'username' => $_SESSION['username'] ?? null,
+                'email' => $_SESSION['email'] ?? null,
+                'type' => $_SESSION['type'] ?? null,
+                'name' => $_SESSION['name'] ?? null
             ];
         }
         return null;

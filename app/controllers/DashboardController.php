@@ -50,7 +50,7 @@ class DashboardController extends BaseController {
     public function deleteJob() {
         $this->requireLogin();
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['job_id'])) {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['job_id'])) {
             $job_id = $_POST['job_id'];
             
             // Check if job has payments or active applications before attempting deletion
@@ -102,7 +102,7 @@ class DashboardController extends BaseController {
         $profile = getFreelancerProfile($this->pdo, $user['id']);
         
         // Handle form submission
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $skills = $_POST['skills'] ?? '';
             $past_projects = $_POST['past_projects'] ?? '';
             $portfolio_link = $_POST['portfolio_link'] ?? '';
@@ -153,7 +153,7 @@ class DashboardController extends BaseController {
             $this->redirect('index.php?page=dashboard');
         }
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && isset($_POST['job_status'])) {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['application_id']) && isset($_POST['job_status'])) {
             $application_id = $_POST['application_id'];
             $job_status = $_POST['job_status'];
             
@@ -239,7 +239,7 @@ class DashboardController extends BaseController {
             $this->redirect('index.php?page=dashboard');
         }
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['offer_id'])) {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['offer_id'])) {
             $offer_id = $_POST['offer_id'];
             
             $application_id = acceptOffer($this->pdo, $offer_id, $_SESSION['user_id']);
@@ -263,7 +263,7 @@ class DashboardController extends BaseController {
             $this->redirect('index.php?page=dashboard');
         }
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['offer_id'])) {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['offer_id'])) {
             $offer_id = $_POST['offer_id'];
             
             if (rejectOffer($this->pdo, $offer_id, $_SESSION['user_id'])) {
@@ -308,7 +308,7 @@ class DashboardController extends BaseController {
         $errors = [];
         
         // Handle form submission
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_payment_info'])) {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['save_payment_info'])) {
             $payment_method = trim($_POST['payment_method'] ?? '');
             $payment_account_info = trim($_POST['payment_account_info'] ?? '');
             

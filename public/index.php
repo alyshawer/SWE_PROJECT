@@ -108,7 +108,7 @@ if (isset($_GET['action'])) {
 }
 
 // Handle POST requests for actions
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     if (isset($_POST['delete_user'])) {
         $routes['admin'] = ['AdminController', 'deleteUser'];
         $page = 'admin';

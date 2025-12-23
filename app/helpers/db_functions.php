@@ -833,18 +833,19 @@ function completePayment($pdo, $paymentId, $transactionId = null) {
         // Try to update with platform_fee first (if column exists)
         // If it fails due to missing column, update without it
         try {
-            $sql = "UPDATE payments SET status = 'completed', transactionId = ?, completedAt = NOW(), platform_fee = ? WHERE id = ?";
+            $now = date('Y-m-d H:i:s');
+            $sql = "UPDATE payments SET status = 'completed', transactionId = ?, completedAt = ?, platform_fee = ? WHERE id = ?";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute([$finalTransactionId, $platformFee, $paymentId]);
+            $stmt->execute([$finalTransactionId, $now, $platformFee, $paymentId]);
         } catch (PDOException $e) {
             // Check if error is due to missing column 'platform_fee'
             if (strpos($e->getMessage(), 'platform_fee') !== false || $e->getCode() == '42S22') {
                 // Column doesn't exist, try update without platform_fee
                 error_log("platform_fee column not found, updating payment without it");
-                $sql = "UPDATE payments SET status = 'completed', transactionId = ?, completedAt = NOW() WHERE id = ?";
+                $now = date('Y-m-d H:i:s');
+                $sql = "UPDATE payments SET status = 'completed', transactionId = ?, completedAt = ? WHERE id = ?";
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$finalTransactionId, $paymentId]);
-            } else {
+                $stmt->execute([$finalTransactionId, $now, $paymentId]);
                 // Re-throw if it's a different error
                 throw $e;
             }
@@ -892,18 +893,19 @@ function completePayment($pdo, $paymentId, $transactionId = null) {
             if ($stmt3) {
                 $stmt3->execute();
                 $row = $stmt3->fetch();
+                $now = date('Y-m-d H:i:s');
                 if ($row && is_numeric($row['config_value'])) {
                     $newTotal = round((float)$row['config_value'] + $platformFee, 2);
-                    $sql4 = "UPDATE system_config SET config_value = ?, updated_at = NOW() WHERE config_key = 'platform_revenue'";
+                    $sql4 = "UPDATE system_config SET config_value = ?, updated_at = ? WHERE config_key = 'platform_revenue'";
                     $stmt4 = $pdo->prepare($sql4);
                     if ($stmt4) {
-                        $stmt4->execute([$newTotal]);
+                        $stmt4->execute([$newTotal, $now]);
                     }
                 } else {
-                    $sql4 = "INSERT INTO system_config (config_key, config_value, updated_at) VALUES ('platform_revenue', ?, NOW())";
+                    $sql4 = "INSERT INTO system_config (config_key, config_value, updated_at) VALUES ('platform_revenue', ?, ?)";
                     $stmt4 = $pdo->prepare($sql4);
                     if ($stmt4) {
-                        $stmt4->execute([$platformFee]);
+                        $stmt4->execute([$platformFee, $now]);
                     }
                 }
             }
@@ -955,10 +957,20 @@ function getClientProfile($pdo, $user_id) {
 }
 
 function createOrUpdateClientProfile($pdo, $user_id, $companyName) {
-    $sql = "INSERT INTO client_profiles (user_id, companyName) VALUES (?, ?)
-            ON DUPLICATE KEY UPDATE companyName = ?";
+    $pdo = db_get_pdo($pdo);
+    // Portable implementation: check then update or insert (works on SQLite and MySQL)
+    $sql = "SELECT id FROM client_profiles WHERE user_id = ?";
     $stmt = $pdo->prepare($sql);
-    return $stmt->execute([$user_id, $companyName, $companyName]);
+    $stmt->execute([$user_id]);
+    if ($stmt->fetch()) {
+        $sql2 = "UPDATE client_profiles SET companyName = ? WHERE user_id = ?";
+        $stmt2 = $pdo->prepare($sql2);
+        return $stmt2->execute([$companyName, $user_id]);
+    } else {
+        $sql3 = "INSERT INTO client_profiles (user_id, companyName) VALUES (?, ?)";
+        $stmt3 = $pdo->prepare($sql3);
+        return $stmt3->execute([$user_id, $companyName]);
+    }
 }
 
 // Admin profile functions
@@ -973,10 +985,22 @@ function getAdminProfile($pdo, $user_id) {
 }
 
 function updateAdminLastLogin($pdo, $user_id) {
-    $sql = "INSERT INTO admin_profiles (user_id, lastLogin) VALUES (?, NOW())
-            ON DUPLICATE KEY UPDATE lastLogin = NOW()";
+    $pdo = db_get_pdo($pdo);
+    // Use PHP timestamp for portability across MySQL/MariaDB and SQLite
+    $now = date('Y-m-d H:i:s');
+
+    $sql = "SELECT id FROM admin_profiles WHERE user_id = ?";
     $stmt = $pdo->prepare($sql);
-    return $stmt->execute([$user_id]);
+    $stmt->execute([$user_id]);
+    if ($stmt->fetch()) {
+        $sql2 = "UPDATE admin_profiles SET lastLogin = ? WHERE user_id = ?";
+        $stmt2 = $pdo->prepare($sql2);
+        return $stmt2->execute([$now, $user_id]);
+    } else {
+        $sql3 = "INSERT INTO admin_profiles (user_id, lastLogin) VALUES (?, ?)";
+        $stmt3 = $pdo->prepare($sql3);
+        return $stmt3->execute([$user_id, $now]);
+    }
 }
 
 

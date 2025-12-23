@@ -12,7 +12,7 @@ class AuthController extends BaseController {
         
         $errors = [];
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $email = trim($_POST['email'] ?? '');
             $password = $_POST['password'] ?? '';
             
@@ -69,7 +69,7 @@ class AuthController extends BaseController {
         $user_type = in_array($user_type, ['freelancer', 'client']) ? $user_type : '';
         $errors = [];
         
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $username = trim($_POST['username'] ?? '');
             $email = trim($_POST['email'] ?? '');
             $password = $_POST['password'] ?? '';
